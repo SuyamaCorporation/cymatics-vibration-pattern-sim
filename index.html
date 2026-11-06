@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>クラドニ図形振動パターンシミュレーター</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-950 text-white min-h-screen">
+<div class="max-w-3xl mx-auto p-4">
+  <h1 class="text-2xl font-bold text-center mb-1 text-amber-400">クラドニ図形振動パターンシミュレーター</h1>
+  <p class="text-center text-gray-400 text-sm mb-4">定常波の節線に砂粒が集まる現象を可視化</p>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+    <div class="bg-gray-800 rounded-xl p-4">
+      <div class="mb-3">
+        <label class="flex justify-between text-sm text-gray-300 mb-1">
+          <span>モード m（水平）</span>
+          <span id="mVal" class="text-amber-400 font-bold">3</span>
+        </label>
+        <input id="sliderM" type="range" min="1" max="8" value="3"
+          class="w-full accent-amber-400" aria-label="モード数m">
+      </div>
+      <div class="mb-3">
+        <label class="flex justify-between text-sm text-gray-300 mb-1">
+          <span>モード n（垂直）</span>
+          <span id="nVal" class="text-amber-400 font-bold">2</span>
+        </label>
+        <input id="sliderN" type="range" min="1" max="8" value="2"
+          class="w-full accent-amber-400" aria-label="モード数n">
+      </div>
+      <div class="mb-3">
+        <label class="flex justify-between text-sm text-gray-300 mb-1">
+          <span>閾値（節線の太さ）</span>
+          <span id="threshVal" class="text-amber-400 font-bold">0.10</span>
+        </label>
+        <input id="sliderThresh" type="range" min="1" max="30" value="10"
+          class="w-full accent-amber-400" aria-label="節線閾値">
+      </div>
+      <div class="mb-3">
+        <label class="flex justify-between text-sm text-gray-300 mb-1">
+          <span>砂粒数</span>
+          <span id="particleCount" class="text-amber-400 font-bold">500</span>
+        </label>
+        <input id="sliderParticles" type="range" min="100" max="2000" step="100" value="500"
+          class="w-full accent-amber-400" aria-label="砂粒数">
+      </div>
+      <button id="btnScatter" class="w-full bg-amber-600 hover:bg-amber-500 py-2 rounded font-semibold transition-colors mt-1" aria-label="砂を撒く">
+        砂を撒く
+      </button>
+      <button id="btnClear" class="w-full bg-gray-600 hover:bg-gray-500 py-2 rounded transition-colors mt-2" aria-label="砂をクリア">
+        砂をクリア
+      </button>
+    </div>
+    <div>
+      <canvas id="canvas" width="400" height="400" class="rounded-xl w-full" style="aspect-ratio:1" aria-label="クラドニ図形キャンバス"></canvas>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-3 gap-3 mb-4">
+    <div class="bg-gray-800 rounded-xl p-3 text-center">
+      <div class="text-gray-400 text-xs mb-1">周波数比</div>
+      <div id="freqRatio" class="text-xl font-bold text-amber-400">-</div>
+    </div>
+    <div class="bg-gray-800 rounded-xl p-3 text-center">
+      <div class="text-gray-400 text-xs mb-1">節線数（概算）</div>
+      <div id="nodeLines" class="text-xl font-bold text-green-400">-</div>
+    </div>
+    <div class="bg-gray-800 rounded-xl p-3 text-center">
+      <div class="text-gray-400 text-xs mb-1">対称性</div>
+      <div id="symmetry" class="text-xl font-bold text-purple-400">-</div>
+    </div>
+  </div>
+
+  <div class="bg-gray-800 rounded-xl p-3 mb-4">
+    <h2 class="text-sm font-semibold text-gray-300 mb-2">パターンプリセット</h2>
+    <div class="flex flex-wrap gap-2">
+      <button class="preset bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm transition-colors" data-m="1" data-n="1">1-1</button>
+      <button class="preset bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm transition-colors" data-m="2" data-n="1">2-1</button>
+      <button class="preset bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm transition-colors" data-m="2" data-n="2">2-2</button>
+      <button class="preset bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm transition-colors" data-m="3" data-n="2">3-2</button>
+      <button class="preset bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm transition-colors" data-m="4" data-n="3">4-3</button>
+      <button class="preset bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm transition-colors" data-m="5" data-n="4">5-4</button>
+      <button class="preset bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm transition-colors" data-m="6" data-n="5">6-5</button>
+      <button class="preset bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm transition-colors" data-m="7" data-n="6">7-6</button>
+    </div>
+  </div>
+
+  <div class="bg-gray-800 rounded-xl p-3">
+    <div class="text-xs text-gray-400">
+      <strong class="text-gray-300">原理:</strong> z(x,y) = sin(mπx/L)·sin(nπy/L) の値がゼロに近い点（節線）に砂粒が集まります。
+      m+n が偶数のとき点対称、奇数のとき非対称なパターンになります。
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const SIZE = canvas.width;
+
+let m = 3, n = 2, thresh = 0.10;
+let particles = [];
+let animFrame = null;
+let settling = false;
+
+function waveZ(x, y) {
+  return Math.sin(m * Math.PI * x / SIZE) * Math.sin(n * Math.PI * y / SIZE);
+}
+
+function isNode(x, y) {
+  return Math.abs(waveZ(x, y)) < thresh;
+}
+
+function drawWavePattern() {
+  const imgData = ctx.createImageData(SIZE, SIZE);
+  const d = imgData.data;
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const z = waveZ(x, y);
+      const az = Math.abs(z);
+      const idx = (y * SIZE + x) * 4;
+      // Dark bg with colored wave
+      const r = Math.floor(az * 60);
+      const g = Math.floor(az * 40);
+      const b = Math.floor(az * 80);
+      d[idx]   = r;
+      d[idx+1] = g;
+      d[idx+2] = b;
+      d[idx+3] = 255;
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+function drawNodeLines() {
+  const imgData = ctx.getImageData(0, 0, SIZE, SIZE);
+  const d = imgData.data;
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      if (isNode(x, y)) {
+        const idx = (y * SIZE + x) * 4;
+        d[idx]   = 220;
+        d[idx+1] = 180;
+        d[idx+2] = 80;
+        d[idx+3] = 255;
+      }
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 1.2, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(240,210,120,${p.alpha})`;
+    ctx.fill();
+  }
+}
+
+function scatterParticles() {
+  const count = parseInt(document.getElementById('sliderParticles').value);
+  particles = [];
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x: Math.random() * SIZE,
+      y: Math.random() * SIZE,
+      vx: (Math.random()-0.5)*2,
+      vy: (Math.random()-0.5)*2,
+      alpha: 0.9
+    });
+  }
+  settling = true;
+  startSettle();
+}
+
+function startSettle() {
+  if (animFrame) cancelAnimationFrame(animFrame);
+  let steps = 0;
+  function animate() {
+    steps++;
+    // move particles toward nearest nodal line
+    for (const p of particles) {
+      const z = waveZ(p.x, p.y);
+      const az = Math.abs(z);
+      // gradient toward zero
+      const eps = 1;
+      const dzx = (Math.abs(waveZ(p.x+eps, p.y)) - az) / eps;
+      const dzy = (Math.abs(waveZ(p.x, p.y+eps)) - az) / eps;
+      p.vx = p.vx * 0.85 - dzx * 1.5 + (Math.random()-0.5)*0.3;
+      p.vy = p.vy * 0.85 - dzy * 1.5 + (Math.random()-0.5)*0.3;
+      p.x += p.vx;
+      p.y += p.vy;
+      // boundary
+      if (p.x < 0) { p.x = 0; p.vx *= -0.5; }
+      if (p.x >= SIZE) { p.x = SIZE-1; p.vx *= -0.5; }
+      if (p.y < 0) { p.y = 0; p.vy *= -0.5; }
+      if (p.y >= SIZE) { p.y = SIZE-1; p.vy *= -0.5; }
+    }
+    redraw();
+    if (steps < 150 && settling) {
+      animFrame = requestAnimationFrame(animate);
+    } else {
+      settling = false;
+    }
+  }
+  animFrame = requestAnimationFrame(animate);
+}
+
+function redraw() {
+  drawWavePattern();
+  drawNodeLines();
+  if (particles.length > 0) drawParticles();
+}
+
+function updateInfo() {
+  document.getElementById('freqRatio').textContent = m+':'+n;
+  document.getElementById('nodeLines').textContent = (m-1)+(n-1);
+  document.getElementById('symmetry').textContent = ((m+n)%2===0)?'点対称':'非対称';
+}
+
+function update() {
+  m = parseInt(document.getElementById('sliderM').value);
+  n = parseInt(document.getElementById('sliderN').value);
+  thresh = parseInt(document.getElementById('sliderThresh').value)/100;
+  document.getElementById('mVal').textContent = m;
+  document.getElementById('nVal').textContent = n;
+  document.getElementById('threshVal').textContent = (thresh).toFixed(2);
+  updateInfo();
+  if (particles.length > 0 && settling) return;
+  redraw();
+  localStorage.setItem('cymatics_mn', JSON.stringify({m,n}));
+}
+
+document.getElementById('sliderM').addEventListener('input', update);
+document.getElementById('sliderN').addEventListener('input', update);
+document.getElementById('sliderThresh').addEventListener('input', update);
+document.getElementById('sliderParticles').addEventListener('input', e => {
+  document.getElementById('particleCount').textContent = e.target.value;
+});
+
+document.getElementById('btnScatter').addEventListener('click', () => {
+  scatterParticles();
+});
+
+document.getElementById('btnClear').addEventListener('click', () => {
+  particles = [];
+  settling = false;
+  if (animFrame) cancelAnimationFrame(animFrame);
+  redraw();
+});
+
+document.querySelectorAll('.preset').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('sliderM').value = btn.dataset.m;
+    document.getElementById('sliderN').value = btn.dataset.n;
+    update();
+    if (particles.length > 0) scatterParticles();
+  });
+});
+
+// restore
+const saved = localStorage.getItem('cymatics_mn');
+if (saved) {
+  try {
+    const {m:sm, n:sn} = JSON.parse(saved);
+    document.getElementById('sliderM').value = sm;
+    document.getElementById('sliderN').value = sn;
+  } catch(e){}
+}
+
+update();
+</script>
+</body>
+</html>
